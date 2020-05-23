@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+DEBMAINTAINER="John Doe <john@doe>"
+set -e
+
+# === Preparations
+CODEDIR=$(realpath ./code) # Git code
+CACHEDIR=$(realpath ./cache) # Used by cmake as a cache
+APPDIR=$(realpath ./app) # Used by cmake for the actual app
+BUILDSDIR=$(realpath ./builds) # Contains builds as they come out of the processor
+CLEANTARGETDIR=$(realpath ./target) # Contains builds really needed by the user, versioned
+[ -d $CODEDIR ] || git clone "https://github.com/Governikus/AusweisApp2" "$CODEDIR"
+cd $CODEDIR
+git remote update
+LATESTTAG=$(git describe --abbrev=0)
+CHOSENTAG="$LATESTTAG"
+[ -z $1 ] || CHOSENTAG=$1
+echo "Latest version tag is '$LATESTTAG'"
+echo "Chosen version tag is '$CHOSENTAG'"
+git checkout "$CHOSENTAG"
+
+# ==== Building
+mkdir "$CACHEDIR" || true
+cd "$CACHEDIR"
+cmake "$CODEDIR/libs" -DCMAKE_BUILD_TYPE=release "-DDESTINATION_DIR=$BUILDSDIR"
+make
+
+mkdir "$APPDIR" || true
+cd "$APPDIR"
+export CMAKE_PREFIX_PATH="$BUILDSDIR/lib/cmake"
+export OPENSSL_ROOT_DIR="$BUILDSDIR"
+cmake "$CODEDIR" -DCMAKE_BUILD_TYPE=release "-DDESTINATION_DIR=$BUILDSDIR"
+make
+
+cd "$APPDIR/src"
+
+# ==== Packaging and redacting
+mkdir "$CLEANTARGETDIR" || true
+
+# =Create a desktop entry
+cat  << EOF > ausweisapp2.desktop
+[Desktop Entry]
+Version=$CHOSENTAG
+Type=Application
+Exec=/usr/local/bin/AusweisApp2
+Icon=/usr/local/share/AusweisApp2_CE/AusweisApp2/npa.svg
+StartupNotify=true
+Terminal=false
+Categories=Utility;Accessibility;
+GenericName=Authentication App
+Keywords=nPA,eID,eAT,Personalausweis,Aufenthaltstitel,Identity,Card
+Name=AusweisApp 2
+EOF
+
+if [ -z "$NODEB" ]; then
+    # ==== Creating a DEB package
+    DEBDIR="$BUILDSDIR/debroot"
+    mkdir -p "$DEBDIR/usr/share/applications"
+    mkdir -p "$DEBDIR/usr/local/bin"
+    mkdir -p "$DEBDIR/usr/local/share/AusweisApp2_CE/AusweisApp2"
+    mkdir -p "$DEBDIR/DEBIAN"
+    cat << EOF > "$DEBDIR/DEBIAN/control"
+Package: ausweisapp2
+Version: $CHOSENTAG
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libqt5websockets5, qml-module-qtquick-controls2, qml-module-qtqml-models2
+Maintainer: $DEBMAINTAINER
+Description: AusweisApp 2
+ Log in on the web with your German ID card
+EOF
+    cp -r AusweisApp2.rcc config.json translations "$CODEDIR/resources/images/npa.svg" "$DEBDIR/usr/local/share/AusweisApp2_CE/AusweisApp2"
+    cp AusweisApp2 "$DEBDIR/usr/local/bin"
+    cp ausweisapp2.desktop "$DEBDIR/usr/share/applications/com.governikus.ausweisapp2.desktop"
+    dpkg-deb --build "$DEBDIR"
+    mv "$DEBDIR.deb" "$CLEANTARGETDIR/ausweisapp2_$CHOSENTAG.deb"
+    rm -r "$DEBDIR"
+fi
+
+if [ -z "$NORAW" ]; then
+    # ==== Creating a subdirectory with raw contents
+    CLEANTARGETVER="$CLEANTARGETDIR/$CHOSENTAG"
+    [ ! -d "$CLEANTARGETVER" ] || rm -Rf "$CLEANTARGETVER"
+    mkdir $CLEANTARGETVER
+    cp -r AusweisApp2 AusweisApp2.rcc config.json translations ausweisapp2.desktop $CLEANTARGETVER
+fi
