@@ -43,7 +43,7 @@ cat  << EOF > ausweisapp2.desktop
 Version=$CHOSENTAG
 Type=Application
 Exec=/usr/local/bin/AusweisApp2
-Icon=/usr/local/share/AusweisApp2_CE/AusweisApp2/npa.svg
+Icon=/usr/local/share/AusweisApp2/npa.svg
 StartupNotify=true
 Terminal=false
 Categories=Utility;Accessibility;
@@ -57,7 +57,7 @@ if [ -z "$NODEB" ]; then
     DEBDIR="$BUILDSDIR/debroot"
     mkdir -p "$DEBDIR/usr/share/applications"
     mkdir -p "$DEBDIR/usr/local/bin"
-    mkdir -p "$DEBDIR/usr/local/share/AusweisApp2_CE/AusweisApp2"
+    mkdir -p "$DEBDIR/usr/local/share/AusweisApp2"
     mkdir -p "$DEBDIR/DEBIAN"
     cat << EOF > "$DEBDIR/DEBIAN/control"
 Package: ausweisapp2
@@ -70,7 +70,7 @@ Maintainer: $DEBMAINTAINER
 Description: AusweisApp 2
  Log in on the web with your German ID card
 EOF
-    cp -r AusweisApp2.rcc config.json translations "$CODEDIR/resources/images/npa.svg" "$DEBDIR/usr/local/share/AusweisApp2_CE/AusweisApp2"
+    cp -r AusweisApp2.rcc config.json translations "$CODEDIR/resources/images/npa.svg" "$DEBDIR/usr/local/share/AusweisApp2"
     cp AusweisApp2 "$DEBDIR/usr/local/bin"
     cp ausweisapp2.desktop "$DEBDIR/usr/share/applications/com.governikus.ausweisapp2.desktop"
     dpkg-deb --build "$DEBDIR"
